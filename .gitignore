@@ -1,6 +1,6 @@
 
 *.o
-test*
+# test*
 test/
 
 *.a
