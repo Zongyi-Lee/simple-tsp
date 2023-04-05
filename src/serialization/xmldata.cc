@@ -44,6 +44,132 @@ static const char NAME_ETAG[]     = "</name>";
 static const char MEMBER_ETAG[]   = "</member>";
 static const char STRUCT_ETAG[]   = "</struct>";
 
+// ================= CONSTRUCTORS ==================== //
+
+XmlElement::XmlElement(const XmlElement& ele) {
+  _type = ele.gettype();
+  switch(_type) {
+    case TypeString:
+      _value.asString = new std::string(*(std::string*)ele.getdata());
+      break;
+    case TypeBinary:
+      _value.asBinary = new BinaryData(*(BinaryData*)ele.getdata());
+      break;
+    case TypeTime:
+      _value.asTime = new struct tm(*(struct tm*)ele.getdata());
+      break;
+    case TypeArray:
+      _value.asArray = new DataArray(*(DataArray*)ele.getdata());
+      break;
+    case TypeStruct:
+      _value.asStruct = new StructData(*(StructData*)ele.getdata());
+      break;
+    default:
+      _value.asDouble = *(double*)ele.getdata();  // take 64 bit datacopy
+      break;
+  }
+}
+
+XmlElement::XmlElement(XmlElement&& ele) noexcept {
+  _type = ele.gettype();
+  switch(_type){
+    case TypeBoolean:
+    case TypeChar:
+    case TypeInt:
+    case TypeDouble:
+      _value.asDouble = *(double*)ele.getdata();
+      break;
+    default:
+      _value.asString = (std::string*)ele.getdata();
+      break;
+  }
+  ele.clear();
+}
+
+XmlElement& XmlElement::operator=(const XmlElement& ele) {
+  if(this != &ele){
+    if(this->_type != TypeNone)
+      this->free(); // free resources
+    _type = ele.gettype();
+    switch(_type) {
+      case TypeString:
+        _value.asString = new std::string(*(std::string*)ele.getdata());
+        break;
+      case TypeBinary:
+        _value.asBinary = new BinaryData(*(BinaryData*)ele.getdata());
+        break;
+      case TypeTime:
+        _value.asTime = new struct tm(*(struct tm*)ele.getdata());
+        break;
+      case TypeArray:
+        _value.asArray = new DataArray(*(DataArray*)ele.getdata());
+        break;
+      case TypeStruct:
+        _value.asStruct = new StructData(*(StructData*)ele.getdata());
+        break;
+      default:
+        _value.asDouble = *(double*)ele.getdata();  // take 64 bit datacopy
+        break;
+    }
+  }
+  return *this;
+}
+
+XmlElement& XmlElement::operator=(XmlElement&& ele) noexcept {
+  if(this != &ele) {
+    if(this->_type != TypeNone)
+      this->free();
+
+    _type = ele.gettype();
+    switch(_type){
+      case TypeBoolean:
+      case TypeChar:
+      case TypeInt:
+      case TypeDouble:
+        _value.asDouble = *(double*)ele.getdata();
+        break;
+      default:
+        _value.asString = (std::string*)ele.getdata();
+        break;
+    }
+    ele.clear();
+  }
+  return *this;
+}
+
+void XmlElement::clear() {
+  _type = TypeNone;
+  _value.asStruct = nullptr;  // clear value field
+}
+
+void XmlElement::free() {
+  switch(_type) {
+    case TypeString:
+      if(_value.asString != nullptr)
+        delete _value.asString;
+      break;
+    case TypeBinary:
+      if(_value.asBinary != nullptr)
+        delete _value.asBinary;
+      break;
+    case TypeTime:
+      if(_value.asTime != nullptr)
+        delete _value.asTime;
+      break;
+    case TypeArray:
+      if(_value.asArray != nullptr)
+        delete _value.asArray;
+      break;
+    case TypeStruct:
+      if(_value.asStruct != nullptr)
+        delete _value.asStruct; 
+    default:
+      break;
+  }
+  _value.asStruct = nullptr;
+}
+
+/* ============================================================= */
 // =================== for debug ================================//
 
 static const std::map<ElementType, const char*> TYPE2NAME = {
@@ -77,26 +203,8 @@ static void printtype(ElementType type) {
 }
 // ===============================================================//
 
-void XmlElement::clear() {
-  switch(_type) {
-    case TypeString:
-      delete _value.asString; break;
-    case TypeBinary:
-      delete _value.asBinary; break;
-    case TypeTime:
-      delete _value.asTime; break;
-    case TypeArray:
-      delete _value.asArray; break;
-    case TypeStruct:
-      delete _value.asStruct; break;
-    default:
-      break;
-  }
-}
 
-/* ============================================================= */
-
-std::string XmlElement::encode() {
+std::string XmlElement::encode() const {
   switch(_type) {
     case TypeBoolean:
       return _bool2xml();
@@ -126,6 +234,10 @@ std::string XmlElement::encode() {
 }
 
 bool XmlElement::decode(const std::string& xml, size_t *offset) {
+  if(_type != TypeNone) {
+    this->free(); // free resource
+    this->clear();
+  }
   if (!XmlUtil::nextTagIs(ELEMENT_TAG, xml, offset))
     return false;
   // fist skip ELEMENT_TAg

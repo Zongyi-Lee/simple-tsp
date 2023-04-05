@@ -38,16 +38,26 @@ public:
 
 	// constructors
 	XmlElement(): _type(TypeNone) { _value.asBinary = 0; };
-	explicit XmlElement(char ch): 				_type(TypeChar) { _value.asChar = ch; }
-	explicit XmlElement(bool b): 					_type(TypeBoolean) { _value.asBool = b; }
-	explicit XmlElement(int v): 					_type(TypeInt) {_value.asInt = v; }
-	explicit XmlElement(double v):			 	_type(TypeDouble) {_value.asDouble = v;}
-	explicit XmlElement(std::string s): 	_type(TypeString) { _value.asString = new std::string(s); }
-	explicit XmlElement(struct tm& t):		_type(TypeTime) {_value.asTime = new struct tm(t); }	
+	XmlElement(const char ch): 				_type(TypeChar) { _value.asChar = ch; }
+	XmlElement(const bool b): 					_type(TypeBoolean) { _value.asBool = b; }
+	XmlElement(const int v): 					_type(TypeInt) {_value.asInt = v; }
+	XmlElement(const double v):			 	_type(TypeDouble) {_value.asDouble = v;}
+	XmlElement(const char* p): 			 	_type(TypeString) { _value.asString = new std::string(p); }
+	XmlElement(const std::string& s): 	_type(TypeString) { _value.asString = new std::string(s); }
+	XmlElement(struct tm& t):		_type(TypeTime) {_value.asTime = new struct tm(t); }	
 	XmlElement(const char *p, size_t sz): _type(TypeBinary) {_value.asBinary = new BinaryData(p, p + sz);}
 
-	~XmlElement() { clear(); }	
-	void clear();	// free resources
+	XmlElement(const XmlElement&ele);
+	XmlElement(XmlElement& ele) = delete;
+	XmlElement(XmlElement&& ele) noexcept;
+	XmlElement& operator=(const XmlElement&); 
+	XmlElement& operator=(XmlElement&&) noexcept;
+	
+
+
+	~XmlElement() { free(); }	
+	void free();	// free data if have
+	void clear();	// set _value to be zero
 
 	// Element type relevent functions
 	bool istype(ElementType type) const { return _type == type; }
@@ -56,12 +66,34 @@ public:
 	ElementType gettype() const { return _type; }
 
 	// XML encode
-	std::string encode();
+	std::string encode() const;
 
 	// XML decode
 	bool decode(const std::string&, size_t*);
 
 	std::ostream& write(std::ostream& os) const;
+	void* getdata() const { 
+		switch(_type) {
+			case TypeBoolean:
+			case TypeChar:
+			case TypeInt:
+			case TypeDouble:
+				return (void*)&_value.asBool;
+			case TypeTime:
+				return _value.asTime;
+			case TypeString:
+				return _value.asString;
+			case TypeBinary:
+				return _value.asBinary;
+			case TypeArray:
+				return _value.asArray;
+			case TypeStruct:
+				return _value.asStruct;
+			default:
+				break;
+		}
+		return nullptr;
+	}
 protected:
   ElementType _type;
 	union {

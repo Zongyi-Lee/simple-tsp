@@ -28,10 +28,10 @@ bool XmlUtil::findTag(const char* tag, const std::string& xml, size_t* offset) {
 }
 
 std::string XmlUtil::getNextTag(const std::string& xml, size_t* offset) {
-  size_t start = *offset;
-  while(start < xml.size() && xml[start] == ' ')
-    start++;
-  if(start >= xml.size() - 1 || xml[start] != '<' || xml[start + 1] =='/')  
+  if(*offset >= xml.size())
+    return "";
+  size_t start = xml.find('<', *offset);
+  if(start == std::string::npos)
     return "";
   size_t end = xml.find('>', start);
   if(end == std::string::npos)
